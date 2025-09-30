@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>OCR Extractor</title>
+</head>
+<body>
+  <h1>Загрузить картинку для распознавания текста</h1>
+  <form id="uploadForm">
+    <input type="file" id="image" name="image" accept="image/*" />
+    <button type="submit">Отправить</button>
+  </form>
+
+  <h2>Результат:</h2>
+  <pre id="result"></pre>
+
+  <script>
+    document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const fileInput = document.getElementById("image");
+      if (!fileInput.files.length) {
+        alert("Выберите файл!");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("image", fileInput.files[0]);
+
+      const response = await fetch("/extract", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      document.getElementById("result").textContent = data.text || data.error;
+    });
+  </script>
+</body>
+</html>
