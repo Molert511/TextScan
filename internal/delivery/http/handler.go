@@ -17,7 +17,7 @@ type Handler struct {
 func NewHandler(r *gin.Engine, uc domain.OCRUsecase) {
 	newHandler := &Handler{uc: uc}
 
-	r.POST("/extract", newHandler.extractText)
+	r.POST("/extract-text", newHandler.extractText)
 }
 
 func (h *Handler) extractText(c *gin.Context) {
