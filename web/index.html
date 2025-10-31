@@ -1,40 +1,144 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>OCR Extractor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Text Extractor</title>
+
+    <!-- Tailwind CSS (via CDN – no build step) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        /* Custom accent color */
+        :root { --accent: #6366f1; }
+        .bg-accent { background-color: var(--accent); }
+        .hover\:bg-accent-dark:hover { background-color: #4f46e5; }
+
+        /* Drag-and-drop styling */
+        .drag-over { @apply border-indigo-500 bg-indigo-50; }
+    </style>
 </head>
-<body>
-  <h1>Загрузить картинку для распознавания текста</h1>
-  <form id="uploadForm">
-    <input type="file" id="image" name="image" accept="image/*" />
-    <button type="submit">Отправить</button>
-  </form>
 
-  <h2>Результат:</h2>
-  <pre id="result"></pre>
+<body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
 
-  <script>
-    document.getElementById("uploadForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
+<div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-8 space-y-8">
 
-      const fileInput = document.getElementById("image");
-      if (!fileInput.files.length) {
-        alert("Выберите файл!");
-        return;
-      }
+    <!-- Header -->
+    <header class="text-center">
+        <h1 class="text-3xl font-bold text-gray-800">Image Text Extractor</h1>
+        <p class="mt-2 text-gray-600">Upload an image and get the text inside it instantly.</p>
+    </header>
 
-      const formData = new FormData();
-      formData.append("image", fileInput.files[0]);
+    <!-- Upload Area -->
+    <div class="relative border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer transition-colors"
+         id="drop-zone">
+        <input type="file" id="image-input" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+        <div class="space-y-3">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+            </svg>
+            <p class="text-lg font-medium text-gray-700">Drop an image here or click to browse</p>
+            <p class="text-sm text-gray-500">Supports PNG, JPG, GIF, WebP</p>
+        </div>
+    </div>
 
-      const response = await fetch("/extract", {
-        method: "POST",
-        body: formData,
-      });
+    <!-- Image Preview -->
+    <div id="preview-container" class="hidden">
+        <img id="image-preview" class="max-w-full rounded-lg shadow-md mx-auto" alt="Preview">
+    </div>
 
-      const data = await response.json();
-      document.getElementById("result").textContent = data.text || data.error;
+    <!-- Action Button -->
+    <div class="flex justify-center">
+        <button id="extract-button"
+                disabled
+                class="px-8 py-3 bg-accent hover:bg-accent-dark text-white font-semibold rounded-lg shadow-md transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed">
+            Extract Text
+        </button>
+    </div>
+
+    <!-- Result Box -->
+    <section>
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">Extracted Text</h2>
+        <div id="result"
+             class="min-h-[120px] p-4 bg-gray-50 border border-gray-200 rounded-lg whitespace-pre-wrap text-gray-700">
+            Upload an image and click <strong>Extract Text</strong> to see the result.
+        </div>
+    </section>
+</div>
+
+<script>
+    const dropZone      = document.getElementById('drop-zone');
+    const imageInput    = document.getElementById('image-input');
+    const previewImg    = document.getElementById('image-preview');
+    const previewContainer = document.getElementById('preview-container');
+    const extractBtn    = document.getElementById('extract-button');
+    const resultDiv     = document.getElementById('result');
+
+    // ----- Drag & Drop UI -----
+    ['dragover', 'dragenter'].forEach(ev => {
+        dropZone.addEventListener(ev, e => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
     });
-  </script>
+    ['dragleave', 'dragend'].forEach(ev => {
+        dropZone.addEventListener(ev, () => dropZone.classList.remove('drag-over'));
+    });
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length) handleFile(files[0]);
+    });
+
+    // ----- File Input -----
+    imageInput.addEventListener('change', () => {
+        if (imageInput.files.length) handleFile(imageInput.files[0]);
+    });
+
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please select a valid image file.');
+            return;
+        }
+        extractBtn.disabled = false;
+
+        const reader = new FileReader();
+        reader.onload = e => {
+            previewImg.src = e.target.result;
+            previewContainer.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ----- Extract Text -----
+    extractBtn.addEventListener('click', async () => {
+        const file = imageInput.files[0];
+        if (!file) return;
+
+        extractBtn.disabled = true;
+        resultDiv.textContent = 'Extracting…';
+
+        const form = new FormData();
+        form.append('image', file);               // <-- match your Gin handler field name
+
+        try {
+            const response = await fetch('http://localhost:8080/extract-text', {
+                method: 'POST',
+                body: form,
+            });
+
+            if (!response.ok) throw new Error(`Server error ${response.status}`);
+
+            const data = await response.json();   // expects { "text": "..." }
+            resultDiv.textContent = data.text?.trim() || 'No text found.';
+        } catch (err) {
+            console.error(err);
+            resultDiv.textContent = `Error: ${err.message}`;
+        } finally {
+            extractBtn.disabled = false;
+        }
+    });
+</script>
 </body>
 </html>
